@@ -59,11 +59,12 @@ def plot_timeseries(data, location, series_name):
         series_title = 'Number of COVID-19 Deaths'
     elif series_name == 'Recovered':
         series_title = 'Number of COVID-19 Recoveries'
-    plt.title(f'{series_title} in {location}\nAs of {update_dt_title}')
+    plot_title = f'{series_title} in {location}\nAs of {update_dt_title}'
+    plt.title(plot_title)
     filename = f'plots/{location}_{series_name}_{update_dt}.png'
     plt.savefig(filename)
     
-    return filename
+    return filename, plot_title
 
 
 def main():
@@ -73,12 +74,19 @@ def main():
         for loc in STATES:
             ts_df = tidy_timeseries(dfs[series], loc, series)
             if ts_df[series].max() > 0:
-                plot_name = plot_timeseries(ts_df, loc, series)
+                plot_name, plot_title = plot_timeseries(ts_df, loc, series)
                 plots.append(plot_name)
                 
-    ### Tweet:
-    #for plot in plots:
-    #    api.update_with_media(plot, status=f'')
+                ## Compose status with current number
+                current_number = ts_df[ts_df['Date'] == ts_df['Date'].max()][series][0]
+                if series == 'Confirmed':
+                    status = f'There have been {current_number} confirmed cases of COVID-19 in {loc}.'
+                elif series == 'Deaths':
+                    status = f'There have been {current_number} deaths from COVID-19 in {loc}.'
+                elif series == 'Recovered':
+                    status = f'The have been {current_number} recoveries from COVID-19 in {loc}.'
+                
+                #api.update_with_media(plot_name, status=status)
     
 if __name__ == "__main__":
     main()
