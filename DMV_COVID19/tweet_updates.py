@@ -1,14 +1,25 @@
 # -*- coding: utf-8 -*-
 """
-Spyder Editor
 
-This is a temporary script file.
+Twitterbot for @DMV_COVID19.  Tweets daily updates on trends in DC, Maryland, and Virginia COVID-19 data.
+
+@author: Michael Dickey
+
 """
 
+import sys
+import requests
+import numpy as np
 import pandas as pd
+from twython import Twython
+from bs4 import BeautifulSoup
+from datetime import datetime
 import matplotlib.pyplot as plt
 import seaborn as sns; sns.set(color_codes=True)
-from datetime import datetime
+
+
+## Twitter API keys and access info
+import config
 
 ### Read in current data
 confirmed_df = pd.read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Confirmed.csv")
@@ -18,27 +29,48 @@ dfs = {'Confirmed': confirmed_df,
        'Deaths': deaths_df,
        'Recovered': recovered_df}
 
+### Connect to Twitter API
+api = Twython(config.api_key, config.api_secret,
+              config.access_token,
+              config.access_token_secret)
+
+
 ### States of interest
 STATES = ['District of Columbia', 'Maryland', 'Virginia']
 
 
 def tidy_timeseries(data, location, series_name):
+    """
+    Function to JHU time series data and put it into a tidy format.
     
+    :param data (DataFrame): DataFrame from JHU timeseries CSV
+    :param location (str): Province/State of interest
+    :param series_name (str): Name of time series (confirmed/deaths/recovered)
+    :return: DataFrame in tidy format
+    """
     tidy_df = (data[data['Province/State'] == location]
                   .melt(id_vars = ['Province/State', 'Country/Region',
                                    'Lat', 'Long'], var_name = 'Date',
                         value_name = series_name)
                   .rename(columns = {'Date':'date_str'}))
     
-    tidy_df['Date'] = tidy_df['date_str'].apply(lambda x: datetime.strptime(x, "%m/%d/%y"))
     
     ## Only include after March 1, 2020 for these states
+    tidy_df['Date'] = tidy_df['date_str'].apply(lambda x: datetime.strptime(x, "%m/%d/%y"))
     tidy_df = tidy_df[tidy_df['Date'] > datetime(2020, 2, 29)]
     
     return tidy_df
 
 
 def plot_timeseries(data, location, series_name):
+    """
+    Function to JHU time series data and put it into a tidy format.
+    
+    :param data (DataFrame): DataFrame in tidy format from tidy_timeseries()
+    :param location (str): Province/State of interest
+    :param series_name (str): Name of time series (confirmed/deaths/recovered)
+    :return: filepath with location of plot to tweet (str)
+    """
     
     ## Initialize lineplot
     plt.figure(figsize=(10,5))
@@ -64,7 +96,7 @@ def plot_timeseries(data, location, series_name):
     filename = f'plots/{location}_{series_name}_{update_dt}.png'
     plt.savefig(filename)
     
-    return filename, plot_title
+    return filename
 
 
 def main():
@@ -74,7 +106,7 @@ def main():
         for loc in STATES:
             ts_df = tidy_timeseries(dfs[series], loc, series)
             if ts_df[series].max() > 0:
-                plot_name, plot_title = plot_timeseries(ts_df, loc, series)
+                plot_name = plot_timeseries(ts_df, loc, series)
                 plots.append(plot_name)
                 
                 ## Compose status with current number
@@ -86,7 +118,7 @@ def main():
                 elif series == 'Recovered':
                     status = f'The have been {current_number} recoveries from COVID-19 in {loc}.'
                 
-                #api.update_with_media(plot_name, status=status)
+                api.update_with_media(plot_name, status=status)
     
 if __name__ == "__main__":
     main()

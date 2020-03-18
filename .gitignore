@@ -9,6 +9,9 @@ __pycache__/
 # plots
 DMV_COVID19/plots/
 
+# config
+DMV_COVID19/config.py
+
 # C extensions
 *.so
 
