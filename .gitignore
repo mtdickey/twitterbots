@@ -9,6 +9,9 @@ __pycache__/
 # plots
 DMV_COVID19/plots/
 
+# logs
+DMV_COVID19/log/
+
 # config
 DMV_COVID19/tweet_config.py
 

@@ -103,16 +103,22 @@ def plot_timeseries(data, location, series_name):
 def main():
     
     ## Iterate through the time series, states...
+    statuses = []
+    plot_names = []
     for series in dfs:
         for loc in STATES:
             ## Tidy the data
             ts_df = tidy_timeseries(dfs[series], loc, series)
+            
+            ## If there's at least 1 case of something and there's a new date in the data,
+            #   make a status and a plot
             if ts_df[series].max() > 0:
                 
                 ## Create the plot
                 plot_name = plot_timeseries(ts_df, loc, series)
+                plot_names.append(plot_name)
                                 
-                ## Format DC differently to make it sound better
+                ## Format DC differently to make it sound better in the status
                 if loc == 'District of Columbia':
                     loc = 'D.C.'
                 
@@ -125,6 +131,7 @@ def main():
                     status = f'There have been {current_number} deaths from COVID-19 in {loc}, as of {current_date}.'
                 elif series == 'Recovered':
                     status = f'The have been {current_number} recoveries from COVID-19 in {loc}, as of {current_date}.'
+                statues.append(status)
                 
                 ## Tweet the trend plot if there's more than 10 cases, otherwise, just the status
                 if current_number > 10:
@@ -133,6 +140,11 @@ def main():
                     api.update_status_with_media(status=status, media_ids = [response['media_id']])
                 else:
                     api.update_status(status=status)
+                    
+    ## Logging tweets sent
+    tweets_sent = pd.DataFrame({'status': statuses, 'plot_filepath': plot_names})
+    tweets_sent.to_csv(f"log/tweet_log_{datetime.now().strftime('%Y-%m-%d_%H:%M:%S')}.csv",
+                       index = False)
     
 if __name__ == "__main__":
     main()
