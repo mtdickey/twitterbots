@@ -10,7 +10,7 @@ __pycache__/
 DMV_COVID19/plots/
 
 # config
-DMV_COVID19/config.py
+DMV_COVID19/tweet_config.py
 
 # C extensions
 *.so

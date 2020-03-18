@@ -12,14 +12,13 @@ import requests
 import numpy as np
 import pandas as pd
 from twython import Twython
-from bs4 import BeautifulSoup
 from datetime import datetime
 import matplotlib.pyplot as plt
 import seaborn as sns; sns.set(color_codes=True)
 
 
 ## Twitter API keys and access info
-import config
+import tweet_config as config
 
 ### Read in current data
 confirmed_df = pd.read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Confirmed.csv")
@@ -91,6 +90,8 @@ def plot_timeseries(data, location, series_name):
         series_title = 'Number of COVID-19 Deaths'
     elif series_name == 'Recovered':
         series_title = 'Number of COVID-19 Recoveries'
+    
+    ## Save the plot
     plot_title = f'{series_title} in {location}\nAs of {update_dt_title}'
     plt.title(plot_title)
     filename = f'plots/{location}_{series_name}_{update_dt}.png'
@@ -101,16 +102,22 @@ def plot_timeseries(data, location, series_name):
 
 def main():
     
-    plots = []
+    ## Iterate through the time series, states...
     for series in dfs:
         for loc in STATES:
+            ## Tidy the data
             ts_df = tidy_timeseries(dfs[series], loc, series)
             if ts_df[series].max() > 0:
+                
+                ## Create the plot
                 plot_name = plot_timeseries(ts_df, loc, series)
-                plots.append(plot_name)
+                                
+                ## Format DC differently to make it sound better
+                if loc == 'District of Columbia':
+                    loc = 'D.C.'
                 
                 ## Compose status with current number
-                current_number = ts_df[ts_df['Date'] == ts_df['Date'].max()][series][0]
+                current_number = ts_df[series][ts_df['Date'].idxmax()]
                 current_date = ts_df['Date'].max().strftime("%b. %d, %Y")
                 if series == 'Confirmed':
                     status = f'There have been {current_number} confirmed cases of COVID-19 in {loc}, as of {current_date}.'
@@ -119,7 +126,13 @@ def main():
                 elif series == 'Recovered':
                     status = f'The have been {current_number} recoveries from COVID-19 in {loc}, as of {current_date}.'
                 
-                api.update_with_media(plot_name, status=status)
+                ## Tweet the trend plot if there's more than 10 cases, otherwise, just the status
+                if current_number > 10:
+                    image_open = open(plot_name, 'rb')
+                    response = api.upload_media(media = image_open)
+                    api.update_status_with_media(status=status, media_ids = [response['media_id']])
+                else:
+                    api.update_status(status=status)
     
 if __name__ == "__main__":
     main()
