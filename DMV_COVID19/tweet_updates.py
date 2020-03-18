@@ -111,12 +111,13 @@ def main():
                 
                 ## Compose status with current number
                 current_number = ts_df[ts_df['Date'] == ts_df['Date'].max()][series][0]
+                current_date = ts_df['Date'].max().strftime("%b. %d, %Y")
                 if series == 'Confirmed':
-                    status = f'There have been {current_number} confirmed cases of COVID-19 in {loc}.'
+                    status = f'There have been {current_number} confirmed cases of COVID-19 in {loc}, as of {current_date}.'
                 elif series == 'Deaths':
-                    status = f'There have been {current_number} deaths from COVID-19 in {loc}.'
+                    status = f'There have been {current_number} deaths from COVID-19 in {loc}, as of {current_date}.'
                 elif series == 'Recovered':
-                    status = f'The have been {current_number} recoveries from COVID-19 in {loc}.'
+                    status = f'The have been {current_number} recoveries from COVID-19 in {loc}, as of {current_date}.'
                 
                 api.update_with_media(plot_name, status=status)
     
