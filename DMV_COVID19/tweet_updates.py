@@ -72,8 +72,8 @@ def plot_timeseries(data, location, series_name):
     """
     
     ## Initialize lineplot
-    plt.figure(figsize=(10,5))
-    chart = plt.figure(figsize=(10,5))
+    plt.figure(figsize=(14,7))
+    chart = plt.figure(figsize=(14,7))
     
     ## Plot the data and rotate date axis labels
     chart = sns.lineplot(x="Date", y=series_name, data=data)
@@ -117,13 +117,18 @@ def main():
             ## Tidy the data
             ts_df = tidy_timeseries(dfs[series], loc, series)
             
-            ## Limit the tweet_history to the state
+            ## Limit the tweet_history to the state and get the most recent date
             tweet_history_state = tweet_history[tweet_history['location'] == loc]
+            if len(tweet_history_state) == 0:
+                ## low date if there hasn't been a tweet yet
+                max_dt_state_history = datetime(1900, 1, 1)
+            else:
+                max_dt_state_history = tweet_history_state['data_date'].max()
             
             ## If there's at least 1 case of something and there's a new date in the data for that state,
             #   make a status and a plot
             if ((ts_df[series].max() > 0) & 
-               (ts_df['Date'].max() > tweet_history_state['data_date'].max())):
+               (ts_df['Date'].max() > max_dt_state_history)):
                 
                 ## Create the plot
                 plot_name = plot_timeseries(ts_df, loc, series)
@@ -137,6 +142,7 @@ def main():
                 ## Compose status with current number
                 current_number = ts_df[series][ts_df['Date'].idxmax()]
                 current_date = ts_df['Date'].max().strftime("%b. %d, %Y")
+                current_datetime = ts_df['Date'].max()
                 if series == 'Confirmed':
                     status = f'There have been {current_number} confirmed cases of COVID-19 in {loc}, as of {current_date}.'
                 elif series == 'Deaths':
@@ -144,13 +150,13 @@ def main():
                 elif series == 'Recovered':
                     status = f'The have been {current_number} recoveries from COVID-19 in {loc}, as of {current_date}.'
                 statuses.append(status)
-                current_dates.append(current_date)
+                current_dates.append(current_datetime)
                 
                 ## Tweet the trend plot if there's more than 10 cases, otherwise, just the status
                 if current_number > 10:
                     image_open = open(plot_name, 'rb')
                     response = api.upload_media(media = image_open)
-                    api.update_status_with_media(status=status, media_ids = [response['media_id']])
+                    api.update_status(status=status, media_ids = [response['media_id']])
                 else:
                     api.update_status(status=status)
                     
@@ -160,7 +166,7 @@ def main():
     if len(tweets_sent) > 0:
         tweets_sent.to_csv(f"log/tweet_log_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv",
                            index = False)
-        tweet_history_new = pd.concat([tweet_history, tweets_sent])
+        tweet_history_new = pd.concat([tweet_history, tweets_sent], sort = False)
         tweet_history_new.to_csv("log/DMV_COVID19_full_tweet_log.csv",
                                  index = False)
     
