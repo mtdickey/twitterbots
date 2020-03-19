@@ -102,23 +102,35 @@ def plot_timeseries(data, location, series_name):
 
 def main():
     
+    ### Read in master file with all tweets sent previously
+    tweet_history = pd.read_csv("log/DMV_COVID19_full_tweet_log.csv")
+    tweet_history['data_date'] = tweet_history['data_date'].apply(lambda x: datetime.strptime(x, "%Y-%m-%d"))
+    
     ## Iterate through the time series, states...
     statuses = []
     plot_names = []
+    current_dates = []
+    locations = []
     for series in dfs:
         for loc in STATES:
+            
             ## Tidy the data
             ts_df = tidy_timeseries(dfs[series], loc, series)
             
-            ## If there's at least 1 case of something and there's a new date in the data,
+            ## Limit the tweet_history to the state
+            tweet_history_state = tweet_history[tweet_history['location'] == loc]
+            
+            ## If there's at least 1 case of something and there's a new date in the data for that state,
             #   make a status and a plot
-            if ts_df[series].max() > 0:
+            if ((ts_df[series].max() > 0) & 
+               (ts_df['Date'].max() > tweet_history_state['data_date'].max())):
                 
                 ## Create the plot
                 plot_name = plot_timeseries(ts_df, loc, series)
                 plot_names.append(plot_name)
                                 
                 ## Format DC differently to make it sound better in the status
+                locations.append(loc)
                 if loc == 'District of Columbia':
                     loc = 'D.C.'
                 
@@ -131,7 +143,8 @@ def main():
                     status = f'There have been {current_number} deaths from COVID-19 in {loc}, as of {current_date}.'
                 elif series == 'Recovered':
                     status = f'The have been {current_number} recoveries from COVID-19 in {loc}, as of {current_date}.'
-                statues.append(status)
+                statuses.append(status)
+                current_dates.append(current_date)
                 
                 ## Tweet the trend plot if there's more than 10 cases, otherwise, just the status
                 if current_number > 10:
@@ -142,9 +155,14 @@ def main():
                     api.update_status(status=status)
                     
     ## Logging tweets sent
-    tweets_sent = pd.DataFrame({'status': statuses, 'plot_filepath': plot_names})
-    tweets_sent.to_csv(f"log/tweet_log_{datetime.now().strftime('%Y-%m-%d_%H:%M:%S')}.csv",
-                       index = False)
+    tweets_sent = pd.DataFrame({'status': statuses, 'plot_filepath': plot_names,
+                                'data_date': current_dates, 'location': locations})
+    if len(tweets_sent) > 0:
+        tweets_sent.to_csv(f"log/tweet_log_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv",
+                           index = False)
+        tweet_history_new = pd.concat([tweet_history, tweets_sent])
+        tweet_history_new.to_csv("log/DMV_COVID19_full_tweet_log.csv",
+                                 index = False)
     
 if __name__ == "__main__":
     main()
