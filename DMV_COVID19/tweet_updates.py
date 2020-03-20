@@ -7,12 +7,17 @@ Twitterbot for @DMV_COVID19.  Tweets daily updates on trends in DC, Maryland, an
 
 """
 
+## Essential packages
 import sys
 import requests
 import numpy as np
 import pandas as pd
 from twython import Twython
 from datetime import datetime
+
+## Viz
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns; sns.set(color_codes=True)
 
