@@ -149,12 +149,22 @@ def main():
                 current_number = np.round(ts_df[series][ts_df['Date'].idxmax()])
                 current_date = ts_df['Date'].max().strftime("%b. %d, %Y")
                 current_datetime = ts_df['Date'].max()
+                if current_number == 1:
+                    have_has = 'has'
+                    plural = ''
+                else:
+                    have_has = 'have'
+                    plural = 's'
                 if series == 'Confirmed':
-                    status = f'There have been {current_number} confirmed cases of COVID-19 in {loc}, as of {current_date}.'
+                    status = f'There {have_has} been {current_number} confirmed case{plural} of COVID-19 in {loc}, as of {current_date}.'
                 elif series == 'Deaths':
-                    status = f'There have been {current_number} deaths from COVID-19 in {loc}, as of {current_date}.'
+                    status = f'There {have_has} been {current_number} death{plural} from COVID-19 in {loc}, as of {current_date}.'
                 elif series == 'Recovered':
-                    status = f'The have been {current_number} recoveries from COVID-19 in {loc}, as of {current_date}.'
+                    if current_number == 1:
+                        recover = 'recovery'
+                    else:
+                        recover = 'recoveries'
+                    status = f'The {have_has} been {current_number} {recover} from COVID-19 in {loc}, as of {current_date}.'
                 statuses.append(status)
                 current_dates.append(current_datetime)
                 
