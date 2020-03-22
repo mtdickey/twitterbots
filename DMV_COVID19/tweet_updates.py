@@ -133,7 +133,8 @@ def main():
             ## If there's at least 1 case of something and there's a new date in the data for that state,
             #   make a status and a plot
             if ((ts_df[series].max() > 0) & 
-               (ts_df['Date'].max() > max_dt_state_history)):
+               (ts_df['Date'].max() > max_dt_state_history) &
+               (~np.isnan(np.round(ts_df[series][ts_df['Date'].idxmax()])))):
                 
                 ## Create the plot
                 plot_name = plot_timeseries(ts_df, loc, series)
@@ -145,7 +146,7 @@ def main():
                     loc = 'D.C.'
                 
                 ## Compose status with current number
-                current_number = ts_df[series][ts_df['Date'].idxmax()]
+                current_number = np.round(ts_df[series][ts_df['Date'].idxmax()])
                 current_date = ts_df['Date'].max().strftime("%b. %d, %Y")
                 current_datetime = ts_df['Date'].max()
                 if series == 'Confirmed':
@@ -164,7 +165,7 @@ def main():
                     api.update_status(status=status, media_ids = [response['media_id']])
                 else:
                     api.update_status(status=status)
-                    
+    
     ## Logging tweets sent
     tweets_sent = pd.DataFrame({'status': statuses, 'plot_filepath': plot_names,
                                 'data_date': current_dates, 'location': locations})
