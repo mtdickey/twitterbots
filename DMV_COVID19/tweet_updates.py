@@ -146,7 +146,7 @@ def main():
                     loc = 'D.C.'
                 
                 ## Compose status with current number
-                current_number = np.round(ts_df[series][ts_df['Date'].idxmax()])
+                current_number = int(ts_df[series][ts_df['Date'].idxmax()])
                 current_date = ts_df['Date'].max().strftime("%b. %d, %Y")
                 current_datetime = ts_df['Date'].max()
                 if current_number == 1:
