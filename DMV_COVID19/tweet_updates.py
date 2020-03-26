@@ -8,6 +8,7 @@ Twitterbot for @DMV_COVID19.  Tweets daily updates on trends in DC, Maryland, an
 """
 
 ## Essential packages
+import io
 import sys
 import requests
 import numpy as np
@@ -25,10 +26,13 @@ import seaborn as sns; sns.set(color_codes=True)
 ## Twitter API keys and access info
 import tweet_config as config
 
-### Read in current data
-confirmed_df = pd.read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv")
-deaths_df    = pd.read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv")
-#recovered_df = pd.read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Recovered.csv")
+### Read in current data from usafacts.org
+confirmed_response = requests.get("https://static.usafacts.org/public/data/covid-19/covid_confirmed_usafacts.csv")
+confirmed_file_object = io.StringIO(confirmed_response.content.decode('utf-8'))
+confirmed_df = pd.read_csv(confirmed_file_object)
+deaths_response = requests.get("https://static.usafacts.org/public/data/covid-19/covid_deaths_usafacts.csv")
+deaths_file_object = io.StringIO(deaths_response.content.decode('utf-8'))
+deaths_df = pd.read_csv(deaths_file_object)
 dfs = {'Confirmed': confirmed_df, 
        'Deaths': deaths_df
        #,'Recovered': recovered_df
@@ -41,27 +45,30 @@ api = Twython(config.api_key, config.api_secret,
 
 
 ### States of interest
-STATES = ['District of Columbia', 'Maryland', 'Virginia']
+STATES = ['DC', 'MD', 'VA']
 
 
 def tidy_timeseries(data, location, series_name):
     """
-    Function to JHU time series data and put it into a tidy format.
+    Function to take USA Facts time series data and put it into a tidy format
+     for a given state.
     
-    :param data (DataFrame): DataFrame from JHU timeseries CSV
-    :param location (str): Province/State of interest
+    :param data (DataFrame): DataFrame from USAfacts timeseries CSV
+    :param location (str): State of interest
     :param series_name (str): Name of time series (confirmed/deaths/recovered)
     :return: DataFrame in tidy format
     """
-    tidy_df = (data[data['Province/State'] == location]
-                  .melt(id_vars = ['Province/State', 'Country/Region',
-                                   'Lat', 'Long'], var_name = 'Date',
-                        value_name = series_name)
-                  .rename(columns = {'Date':'date_str'}))
-    
+    data = data.drop(columns = [c for c in data.columns if 'Unnamed' in c])
+    tidy_df = (data[data['State'] == location]
+                  .drop(columns = ['countyFIPS', 'County Name'])
+                  .groupby('State').sum().reset_index()
+                  .melt(id_vars = ['State', 'stateFIPS'],
+                        var_name = 'date_str',
+                        value_name = series_name))
+    tidy_df[series_name] = tidy_df[series_name].apply(lambda x: int(x))
     
     ## Only include after March 1, 2020 for these states
-    tidy_df['Date'] = tidy_df['date_str'].apply(lambda x: datetime.strptime(x, "%m/%d/%y"))
+    tidy_df['Date'] = tidy_df['date_str'].apply(lambda x: datetime.strptime(x, "%m/%d/%Y"))
     tidy_df = tidy_df[tidy_df['Date'] > datetime(2020, 2, 29)]
     
     return tidy_df
@@ -69,10 +76,10 @@ def tidy_timeseries(data, location, series_name):
 
 def plot_timeseries(data, location, series_name):
     """
-    Function to JHU time series data and put it into a tidy format.
+    Function to plot tidied USA facts time series data.
     
     :param data (DataFrame): DataFrame in tidy format from tidy_timeseries()
-    :param location (str): Province/State of interest
+    :param location (str): State of interest
     :param series_name (str): Name of time series (confirmed/deaths/recovered)
     :return: filepath with location of plot to tweet (str)
     """
@@ -97,8 +104,15 @@ def plot_timeseries(data, location, series_name):
     elif series_name == 'Recovered':
         series_title = 'Number of COVID-19 Recoveries'
     
+    if location == 'DC':
+        loc_name = 'D.C.'
+    elif location == 'MD':
+        loc_name = 'Maryland'
+    elif location == 'VA':
+        loc_name = 'Virginia'
+    
     ## Save the plot
-    plot_title = f'{series_title} in {location}\nAs of {update_dt_title}'
+    plot_title = f'{series_title} in {loc_name}\nAs of {update_dt_title}'
     plt.title(plot_title)
     filename = f'plots/{location}_{series_name}_{update_dt}.png'
     plt.savefig(filename)
@@ -127,7 +141,7 @@ def main():
             tweet_history_state = tweet_history[tweet_history['location'] == loc]
             if len(tweet_history_state) == 0:
                 ## low date if there hasn't been a tweet yet
-                max_dt_state_history = datetime(1900, 1, 1)
+                max_dt_state_history = pd.Timestamp('1900-01-01')
             else:
                 max_dt_state_history = tweet_history_state['data_date'].max()
             
@@ -143,8 +157,12 @@ def main():
                                 
                 ## Format DC differently to make it sound better in the status
                 locations.append(loc)
-                if loc == 'District of Columbia':
-                    loc = 'D.C.'
+                if loc == 'DC':
+                    loc_name = 'D.C.'
+                elif loc == 'MD':
+                    loc_name = 'Maryland'
+                elif loc == 'VA':
+                    loc_name = 'Virginia'
                 
                 ## Compose status with current number
                 current_number = int(ts_df[series][ts_df['Date'].idxmax()])
@@ -157,15 +175,15 @@ def main():
                     have_has = 'have'
                     plural = 's'
                 if series == 'Confirmed':
-                    status = f'There {have_has} been {current_number} confirmed case{plural} of COVID-19 in {loc}, as of {current_date}.'
+                    status = f'There {have_has} been {current_number} confirmed case{plural} of COVID-19 in {loc_name}, as of {current_date}.'
                 elif series == 'Deaths':
-                    status = f'There {have_has} been {current_number} death{plural} from COVID-19 in {loc}, as of {current_date}.'
+                    status = f'There {have_has} been {current_number} death{plural} from COVID-19 in {loc_name}, as of {current_date}.'
                 elif series == 'Recovered':
                     if current_number == 1:
                         recover = 'recovery'
                     else:
                         recover = 'recoveries'
-                    status = f'The {have_has} been {current_number} {recover} from COVID-19 in {loc}, as of {current_date}.'
+                    status = f'The {have_has} been {current_number} {recover} from COVID-19 in {loc_name}, as of {current_date}.'
                 statuses.append(status)
                 current_dates.append(current_datetime)
                 
