@@ -175,15 +175,15 @@ def main():
                     have_has = 'have'
                     plural = 's'
                 if series == 'Confirmed':
-                    status = f'There {have_has} been {current_number} confirmed case{plural} of COVID-19 in {loc_name}, as of {current_date}.'
+                    status = f'There {have_has} been {current_number} confirmed case{plural} of COVID-19 in {loc_name}, as of {current_date}. Source: @usafacts #MadewithUSAFacts.'
                 elif series == 'Deaths':
-                    status = f'There {have_has} been {current_number} death{plural} from COVID-19 in {loc_name}, as of {current_date}.'
+                    status = f'There {have_has} been {current_number} death{plural} from COVID-19 in {loc_name}, as of {current_date}. Source: @usafacts #MadewithUSAFacts.'
                 elif series == 'Recovered':
                     if current_number == 1:
                         recover = 'recovery'
                     else:
                         recover = 'recoveries'
-                    status = f'The {have_has} been {current_number} {recover} from COVID-19 in {loc_name}, as of {current_date}.'
+                    status = f'The {have_has} been {current_number} {recover} from COVID-19 in {loc_name}, as of {current_date}. Source: @usafacts #MadewithUSAFacts.'
                 statuses.append(status)
                 current_dates.append(current_datetime)
                 
