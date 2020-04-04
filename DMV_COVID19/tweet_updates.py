@@ -33,9 +33,11 @@ deaths_response = requests.get("https://usafactsstatic.blob.core.windows.net/pub
 deaths_file_object = io.StringIO(deaths_response.content.decode('utf-8'))
 deaths_df = pd.read_csv(deaths_file_object)
 dfs = {'Confirmed': {'df': confirmed_df,
-                     'series_title': 'Number of Confirmed COVID-19 Cases'}, 
+                     'series_title': 'Number of Confirmed COVID-19 Cases',
+                     'status': 'confirmed cases'}, 
        'Deaths': {'df': deaths_df,
-                  'series_title': 'Number of COVID-19 Deaths'}
+                  'series_title': 'Number of COVID-19 Deaths',
+                  'status': 'deaths'}
        }
 
 ### Connect to Twitter API
@@ -157,37 +159,26 @@ def main():
             if ((ts_df[series].max() > 0) & 
                (ts_df['Date'].max() > max_dt_state_history) &
                (~np.isnan(np.round(ts_df[series][ts_df['Date'].idxmax()])))):
-                
-                print(loc)
-                
+                                
                 ## Create the plot
                 plot_name = plot_timeseries(ts_df, loc, series)
                 plot_names.append(plot_name)
                                 
-                ## Format DC differently to make it sound better in the status
+                ## Get the location name and add to the list for the log DF
                 locations.append(loc)
                 loc_name = STATES[loc]
                 
-                ## Compose status with current number
-                current_number = int(ts_df[series][ts_df['Date'].idxmax()])
+                ## Compose status with current number and date
+                if loc == 'All': 
+                    ## Sum across all states for all
+                    current_number = np.sum(ts_df[ts_df['Date'] == ts_df['Date'].max()][series])
+                else:
+                    current_number = int(ts_df[series][ts_df['Date'].idxmax()])
+                    
                 current_date = ts_df['Date'].max().strftime("%b. %d, %Y")
                 current_datetime = ts_df['Date'].max()
-                if current_number == 1:
-                    have_has = 'has'
-                    plural = ''
-                else:
-                    have_has = 'have'
-                    plural = 's'
-                if series == 'Confirmed':
-                    status = f'There {have_has} been {current_number:,} confirmed case{plural} of COVID-19 in {loc_name}, as of {current_date}. Source: @usafacts #MadewithUSAFacts.'
-                elif series == 'Deaths':
-                    status = f'There {have_has} been {current_number:,} death{plural} from COVID-19 in {loc_name}, as of {current_date}. Source: @usafacts #MadewithUSAFacts.'
-                elif series == 'Recovered':
-                    if current_number == 1:
-                        recover = 'recovery'
-                    else:
-                        recover = 'recoveries'
-                    status = f'The {have_has} been {current_number:,} {recover} from COVID-19 in {loc_name}, as of {current_date}. Source: @usafacts #MadewithUSAFacts.'
+                                
+                status = f"There have been {current_number:,} {dfs[series]['status']} of COVID-19 in {loc_name}, as of {current_date}. Source: @usafacts #MadewithUSAFacts."
                 statuses.append(status)
                 current_dates.append(current_datetime)
                 
