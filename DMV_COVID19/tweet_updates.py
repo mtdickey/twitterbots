@@ -9,7 +9,6 @@ Twitterbot for @DMV_COVID19.  Tweets daily updates on trends in DC, Maryland, an
 
 ## Essential packages
 import io
-import sys
 import requests
 import numpy as np
 import pandas as pd
@@ -33,9 +32,10 @@ confirmed_df = pd.read_csv(confirmed_file_object)
 deaths_response = requests.get("https://usafactsstatic.blob.core.windows.net/public/data/covid-19/covid_deaths_usafacts.csv")
 deaths_file_object = io.StringIO(deaths_response.content.decode('utf-8'))
 deaths_df = pd.read_csv(deaths_file_object)
-dfs = {'Confirmed': confirmed_df, 
-       'Deaths': deaths_df
-       #,'Recovered': recovered_df
+dfs = {'Confirmed': {'df': confirmed_df,
+                     'series_title': 'Number of Confirmed COVID-19 Cases'}, 
+       'Deaths': {'df': deaths_df,
+                  'series_title': 'Number of COVID-19 Deaths'}
        }
 
 ### Connect to Twitter API
@@ -45,7 +45,10 @@ api = Twython(config.api_key, config.api_secret,
 
 
 ### States of interest
-STATES = ['DC', 'MD', 'VA']
+STATES = {'DC': 'D.C',
+          'MD': 'Maryland',
+          'VA': 'Virginia',
+          'All': 'the DMV'}
 
 
 def tidy_timeseries(data, location, series_name):
@@ -58,18 +61,30 @@ def tidy_timeseries(data, location, series_name):
     :param series_name (str): Name of time series (confirmed/deaths/recovered)
     :return: DataFrame in tidy format
     """
+    
+    ## Remove some extra columns
     data = data.drop(columns = [c for c in data.columns if 'Unnamed' in c])
-    tidy_df = (data[data['State'] == location]
-                  .drop(columns = ['countyFIPS', 'County Name'])
-                  .groupby('State').sum().reset_index()
-                  .melt(id_vars = ['State', 'stateFIPS'],
-                        var_name = 'date_str',
-                        value_name = series_name))
-    tidy_df[series_name] = tidy_df[series_name].apply(lambda x: int(x))
+    
+    ## Subset to state and pivot/melt dates to an individual column
+    if location != 'All':
+        tidy_df = (data[data['State'] == location]
+                      .drop(columns = ['countyFIPS', 'County Name'])
+                      .groupby('State').sum().reset_index()
+                      .melt(id_vars = ['State', 'stateFIPS'],
+                            var_name = 'date_str',
+                            value_name = series_name))
+    else:
+        tidy_df = (data[data['State'].isin(['DC', 'MD', 'VA'])]
+                      .drop(columns = ['countyFIPS', 'County Name'])
+                      .groupby('State').sum().reset_index()
+                      .melt(id_vars = ['State', 'stateFIPS'],
+                            var_name = 'date_str',
+                            value_name = series_name))
+    tidy_df[series_name] = tidy_df[series_name].astype(int)
     
     ## Only include after March 1, 2020 for these states
     tidy_df['Date'] = tidy_df['date_str'].apply(lambda x: datetime.strptime(x, "%m/%d/%y"))
-    tidy_df = tidy_df[tidy_df['Date'] > datetime(2020, 2, 29)]
+    tidy_df = tidy_df[tidy_df['Date'] > datetime(2020, 3, 9)]
     
     return tidy_df
 
@@ -89,7 +104,10 @@ def plot_timeseries(data, location, series_name):
     chart = plt.figure(figsize=(14,7))
     
     ## Plot the data and rotate date axis labels
-    chart = sns.lineplot(x="Date", y=series_name, data=data)
+    if location != 'All':
+        chart = sns.lineplot(x="Date", y=series_name, data=data)
+    else:
+        chart = sns.lineplot(x="Date", y=series_name, data=data, hue = 'State')
     plt.xticks(rotation=30)
     
     ## Most recent date
@@ -97,19 +115,8 @@ def plot_timeseries(data, location, series_name):
     update_dt_title = data['Date'].max().strftime("%b. %d, %Y")
     
     ## Set the title depending on location, series name, and recent date
-    if series_name == 'Confirmed':
-        series_title = 'Number of Confirmed COVID-19 Cases'
-    elif series_name == 'Deaths':
-        series_title = 'Number of COVID-19 Deaths'
-    elif series_name == 'Recovered':
-        series_title = 'Number of COVID-19 Recoveries'
-    
-    if location == 'DC':
-        loc_name = 'D.C.'
-    elif location == 'MD':
-        loc_name = 'Maryland'
-    elif location == 'VA':
-        loc_name = 'Virginia'
+    series_title = dfs[series_name]['series_title']    
+    loc_name = STATES[location]
     
     ## Save the plot
     plot_title = f'{series_title} in {loc_name}\nAs of {update_dt_title}'
@@ -133,9 +140,9 @@ def main():
     locations = []
     for series in dfs:
         for loc in STATES:
-            
+                        
             ## Tidy the data
-            ts_df = tidy_timeseries(dfs[series], loc, series)
+            ts_df = tidy_timeseries(dfs[series]['df'], loc, series)
             
             ## Limit the tweet_history to the state and get the most recent date
             tweet_history_state = tweet_history[tweet_history['location'] == loc]
@@ -151,18 +158,15 @@ def main():
                (ts_df['Date'].max() > max_dt_state_history) &
                (~np.isnan(np.round(ts_df[series][ts_df['Date'].idxmax()])))):
                 
+                print(loc)
+                
                 ## Create the plot
                 plot_name = plot_timeseries(ts_df, loc, series)
                 plot_names.append(plot_name)
                                 
                 ## Format DC differently to make it sound better in the status
                 locations.append(loc)
-                if loc == 'DC':
-                    loc_name = 'D.C.'
-                elif loc == 'MD':
-                    loc_name = 'Maryland'
-                elif loc == 'VA':
-                    loc_name = 'Virginia'
+                loc_name = STATES[loc]
                 
                 ## Compose status with current number
                 current_number = int(ts_df[series][ts_df['Date'].idxmax()])
