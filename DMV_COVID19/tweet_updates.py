@@ -27,10 +27,10 @@ import seaborn as sns; sns.set(color_codes=True)
 import tweet_config as config
 
 ### Read in current data from usafacts.org
-confirmed_response = requests.get("https://static.usafacts.org/public/data/covid-19/covid_confirmed_usafacts.csv")
+confirmed_response = requests.get("https://usafactsstatic.blob.core.windows.net/public/data/covid-19/covid_confirmed_usafacts.csv")
 confirmed_file_object = io.StringIO(confirmed_response.content.decode('utf-8'))
 confirmed_df = pd.read_csv(confirmed_file_object)
-deaths_response = requests.get("https://static.usafacts.org/public/data/covid-19/covid_deaths_usafacts.csv")
+deaths_response = requests.get("https://usafactsstatic.blob.core.windows.net/public/data/covid-19/covid_deaths_usafacts.csv")
 deaths_file_object = io.StringIO(deaths_response.content.decode('utf-8'))
 deaths_df = pd.read_csv(deaths_file_object)
 dfs = {'Confirmed': confirmed_df, 
@@ -68,7 +68,7 @@ def tidy_timeseries(data, location, series_name):
     tidy_df[series_name] = tidy_df[series_name].apply(lambda x: int(x))
     
     ## Only include after March 1, 2020 for these states
-    tidy_df['Date'] = tidy_df['date_str'].apply(lambda x: datetime.strptime(x, "%m/%d/%Y"))
+    tidy_df['Date'] = tidy_df['date_str'].apply(lambda x: datetime.strptime(x, "%m/%d/%y"))
     tidy_df = tidy_df[tidy_df['Date'] > datetime(2020, 2, 29)]
     
     return tidy_df
@@ -175,15 +175,15 @@ def main():
                     have_has = 'have'
                     plural = 's'
                 if series == 'Confirmed':
-                    status = f'There {have_has} been {current_number} confirmed case{plural} of COVID-19 in {loc_name}, as of {current_date}. Source: @usafacts #MadewithUSAFacts.'
+                    status = f'There {have_has} been {current_number:,} confirmed case{plural} of COVID-19 in {loc_name}, as of {current_date}. Source: @usafacts #MadewithUSAFacts.'
                 elif series == 'Deaths':
-                    status = f'There {have_has} been {current_number} death{plural} from COVID-19 in {loc_name}, as of {current_date}. Source: @usafacts #MadewithUSAFacts.'
+                    status = f'There {have_has} been {current_number:,} death{plural} from COVID-19 in {loc_name}, as of {current_date}. Source: @usafacts #MadewithUSAFacts.'
                 elif series == 'Recovered':
                     if current_number == 1:
                         recover = 'recovery'
                     else:
                         recover = 'recoveries'
-                    status = f'The {have_has} been {current_number} {recover} from COVID-19 in {loc_name}, as of {current_date}. Source: @usafacts #MadewithUSAFacts.'
+                    status = f'The {have_has} been {current_number:,} {recover} from COVID-19 in {loc_name}, as of {current_date}. Source: @usafacts #MadewithUSAFacts.'
                 statuses.append(status)
                 current_dates.append(current_datetime)
                 

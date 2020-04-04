@@ -37,10 +37,10 @@ def setup_data():
     """
 
     ### Read in current data from usafacts.org
-    confirmed_response = requests.get("https://static.usafacts.org/public/data/covid-19/covid_confirmed_usafacts.csv")
+    confirmed_response = requests.get("https://usafactsstatic.blob.core.windows.net/public/data/covid-19/covid_confirmed_usafacts.csv")
     confirmed_file_object = io.StringIO(confirmed_response.content.decode('utf-8'))
     confirmed_df = pd.read_csv(confirmed_file_object)
-    deaths_response = requests.get("https://static.usafacts.org/public/data/covid-19/covid_deaths_usafacts.csv")
+    deaths_response = requests.get("https://usafactsstatic.blob.core.windows.net/public/data/covid-19/covid_deaths_usafacts.csv")
     deaths_file_object = io.StringIO(deaths_response.content.decode('utf-8'))
     deaths_df = pd.read_csv(deaths_file_object)
 
@@ -186,7 +186,7 @@ def tweet_image(gdf, series_name, top_n = 5):
     top_n_gdf = gdf.nlargest(top_n, last_day)
     top_phrasing = ''
     for i, row in top_n_gdf.iterrows():
-        top_phrasing = f"{top_phrasing}{row['County Name']}, {row['State']}: {int(row[last_day])}\n"
+        top_phrasing = f"{top_phrasing}{row['County Name']}, {row['State']}: {int(row[last_day]):,}\n"
     
     ## Series phrasing
     if series_name == 'Confirmed':
