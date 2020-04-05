@@ -47,9 +47,9 @@ api = Twython(config.api_key, config.api_secret,
 
 
 ### States of interest
-STATES = {'DC': 'D.C',
-          'MD': 'Maryland',
-          'VA': 'Virginia',
+STATES = {#'DC': 'D.C',
+          #'MD': 'Maryland',
+          #'VA': 'Virginia',
           'All': 'the DMV'}
 
 
@@ -171,14 +171,19 @@ def main():
                 ## Compose status with current number and date
                 if loc == 'All': 
                     ## Sum across all states for all
-                    current_number = np.sum(ts_df[ts_df['Date'] == ts_df['Date'].max()][series])
+                    current_date_df = ts_df[ts_df['Date'] == ts_df['Date'].max()].sort_values(series, ascending = False).copy()
+                    current_number = np.sum(current_date_df[series])
+                    top_phrasing = ''
+                    for i, row in current_date_df.iterrows():
+                        top_phrasing = f"{top_phrasing}{row['State']}: {np.round(row[series], 1):,}\n"
                 else:
                     current_number = int(ts_df[series][ts_df['Date'].idxmax()])
+                    top_phrasing = ''
                     
                 current_date = ts_df['Date'].max().strftime("%b. %d, %Y")
                 current_datetime = ts_df['Date'].max()
                                 
-                status = f"There have been {current_number:,} {dfs[series]['status']} of COVID-19 in {loc_name}, as of {current_date}. Source: @usafacts #MadewithUSAFacts."
+                status = f"There have been {current_number:,} {dfs[series]['status']} of COVID-19 in {loc_name}, as of {current_date}.\n\n{top_phrasing}\nSource: @usafacts #MadewithUSAFacts."
                 statuses.append(status)
                 current_dates.append(current_datetime)
                 
