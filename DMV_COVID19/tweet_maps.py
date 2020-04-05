@@ -95,7 +95,7 @@ def tweet_image(gdf, series_name, top_n = 5, pop_adjusted = False):
     ## Find the last day in the data
     variables = [col for col in gdf.columns] #variables are dates with '/' in column names
     last_day = variables[len(variables)-1]
-    last_day_dt_str = datetime.strptime(last_day, "%m/%d/%y").strftime("%m/%d/%Y")
+    last_day_dt_str = datetime.strptime(last_day, "%m/%d/%Y").strftime("%m/%d/%Y")
     
     ## If it's population adjusted, make a new column and use that as the variable
     if pop_adjusted:
@@ -138,7 +138,7 @@ def tweet_image(gdf, series_name, top_n = 5, pop_adjusted = False):
     fig.savefig(img_path, dpi=300)
     
     ## Top X counties phrasing for status
-    top_n_gdf = gdf.nlargest(top_n, last_day)
+    top_n_gdf = gdf.nlargest(top_n, variable)
     top_phrasing = ''
     for i, row in top_n_gdf.iterrows():
         if pop_adjusted:
