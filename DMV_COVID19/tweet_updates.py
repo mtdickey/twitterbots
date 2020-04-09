@@ -85,7 +85,7 @@ def tidy_timeseries(data, location, series_name):
     tidy_df[series_name] = tidy_df[series_name].astype(int)
     
     ## Only include after March 1, 2020 for these states
-    tidy_df['Date'] = tidy_df['date_str'].apply(lambda x: datetime.strptime(x, "%m/%d/%Y"))
+    tidy_df['Date'] = tidy_df['date_str'].apply(lambda x: datetime.strptime(x, "%m/%d/%y"))
     tidy_df = tidy_df[tidy_df['Date'] > datetime(2020, 3, 9)]
     
     return tidy_df
