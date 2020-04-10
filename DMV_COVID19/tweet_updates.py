@@ -34,10 +34,10 @@ deaths_file_object = io.StringIO(deaths_response.content.decode('utf-8'))
 deaths_df = pd.read_csv(deaths_file_object)
 dfs = {'Confirmed': {'df': confirmed_df,
                      'series_title': 'Number of Confirmed COVID-19 Cases',
-                     'status': 'confirmed cases'}, 
+                     'status': 'confirmed cases of'}, 
        'Deaths': {'df': deaths_df,
                   'series_title': 'Number of COVID-19 Deaths',
-                  'status': 'deaths'}
+                  'status': 'deaths from'}
        }
 
 ### Connect to Twitter API
@@ -183,7 +183,7 @@ def main():
                 current_date = ts_df['Date'].max().strftime("%b. %d, %Y")
                 current_datetime = ts_df['Date'].max()
                                 
-                status = f"There have been {current_number:,} {dfs[series]['status']} of COVID-19 in {loc_name}, as of {current_date}.\n\n{top_phrasing}\nSource: @usafacts #MadewithUSAFacts."
+                status = f"There have been {current_number:,} {dfs[series]['status']} COVID-19 in {loc_name}, as of {current_date}.\n\n{top_phrasing}\nSource: @usafacts #MadewithUSAFacts."
                 statuses.append(status)
                 current_dates.append(current_datetime)
                 
