@@ -95,7 +95,11 @@ def tweet_image(gdf, series_name, top_n = 5, pop_adjusted = False):
     ## Find the last day in the data
     variables = [col for col in gdf.columns] #variables are dates with '/' in column names
     last_day = variables[len(variables)-1]
-    last_day_dt_str = datetime.strptime(last_day, "%m/%d/%Y").strftime("%m/%d/%Y")
+    if len(last_day) > 8:
+        fmt = "%m/%d/%Y"
+    else:
+        fmt = "%m/%d/%y"
+    last_day_dt_str = datetime.strptime(last_day, fmt).strftime("%m/%d/%Y")
     
     ## If it's population adjusted, make a new column and use that as the variable
     if pop_adjusted:
