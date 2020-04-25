@@ -34,10 +34,18 @@ deaths_file_object = io.StringIO(deaths_response.content.decode('utf-8'))
 deaths_df = pd.read_csv(deaths_file_object)
 dfs = {'Confirmed': {'df': confirmed_df,
                      'series_title': 'Number of Confirmed COVID-19 Cases',
-                     'status': 'confirmed cases of'}, 
+                     'curve_title': 'New reported cases by day',
+                     'curve_color': 'salmon',
+                     'curve_y_axis': 'Confirmed Cases',
+                     'status': 'confirmed cases of',
+                     'new_case_status': 'new reported cases of'}, 
        'Deaths': {'df': deaths_df,
                   'series_title': 'Number of COVID-19 Deaths',
-                  'status': 'deaths from'}
+                  'curve_title': 'New reported deaths by day',
+                  'curve_color': '#737373',
+                  'curve_y_axis': 'Deaths',
+                  'status': 'deaths from',
+                  'new_case_status': 'new reported deaths of'}
        }
 
 ### Connect to Twitter API
@@ -47,9 +55,9 @@ api = Twython(config.api_key, config.api_secret,
 
 
 ### States of interest
-STATES = {#'DC': 'D.C',
-          #'MD': 'Maryland',
-          #'VA': 'Virginia',
+STATES = {'DC': 'D.C',
+          'MD': 'Maryland',
+          'VA': 'Virginia',
           'All': 'the DMV'}
 
 
@@ -92,6 +100,10 @@ def tidy_timeseries(data, location, series_name):
     tidy_df['Date'] = tidy_df['date_str'].apply(lambda x: datetime.strptime(x, fmt))
     tidy_df = tidy_df[tidy_df['Date'] > datetime(2020, 3, 9)]
     
+    ## Find the increase since the day before (lagged difference)
+    tidy_df['lag1'] = tidy_df[series_name].shift()
+    tidy_df['new'] = tidy_df[series_name] - tidy_df['lag1']
+    
     return tidy_df
 
 
@@ -133,6 +145,45 @@ def plot_timeseries(data, location, series_name):
     return filename
 
 
+def new_case_curve(data, location, series_name):
+    """
+    Function to plot the curve of new cases over time for a location of interest.
+    
+    :param data (DataFrame): DataFrame in tidy format from tidy_timeseries()
+    :param location (str): State of interest
+    :param series_name (str): Name of time series (confirmed/deaths/recovered)
+    :return: filepath with location of plot to tweet (str)
+    """
+    
+    ## Subset to only positive days (negative new cases/deaths don't make sense)
+    data = data[data['new'] >= 0].copy()
+    data['label'] = [dt[:-3] if (dt.endswith('10/20') | dt.endswith('/1/20') | dt.endswith('20/20')) else ''
+                     for dt in data['date_str'] ]  ## Label only certain days
+    
+    ## Initialize histogram
+    chart = plt.figure(figsize=(14,7))
+    
+    ## Barplot across dates
+    chart = sns.barplot(x = 'Date', y = 'new', color = dfs[series_name]['curve_color'], data = data)
+    chart.set_xticklabels(data['label'], rotation=30, fontsize=10)
+    chart.set(xlabel = '', ylabel = dfs[series_name]['curve_y_axis'])
+    
+    ## Set the title depending on location, series name, and recent date
+    curve_title = dfs[series_name]['curve_title']    
+    loc_name = STATES[location]
+    
+    ## Most recent date
+    update_dt = data['Date'].max().strftime("%Y-%m-%d")
+    update_dt_title = data['Date'].max().strftime("%b. %d, %Y")
+    
+    ## Save the plot
+    plot_title = f'{curve_title} in {loc_name}\nAs of {update_dt_title}'
+    plt.title(plot_title)
+    filename = f'plots/new_curve_{location}_{series_name}_{update_dt}.png'
+    plt.savefig(filename)
+
+    return filename
+
 def main():
     
     ### Read in master file with all tweets sent previously
@@ -140,8 +191,10 @@ def main():
     tweet_history['data_date'] = tweet_history['data_date'].apply(lambda x: datetime.strptime(x, "%Y-%m-%d"))
     
     ## Iterate through the time series, states...
-    statuses = []
-    plot_names = []
+    ts_statuses = []
+    ts_plot_names = []
+    new_case_statuses = []
+    new_case_plot_names = []
     current_dates = []
     locations = []
     for series in dfs:
@@ -163,45 +216,73 @@ def main():
             if ((ts_df[series].max() > 0) & 
                (ts_df['Date'].max() > max_dt_state_history) &
                (~np.isnan(np.round(ts_df[series][ts_df['Date'].idxmax()])))):
-                                
-                ## Create the plot
-                plot_name = plot_timeseries(ts_df, loc, series)
-                plot_names.append(plot_name)
-                                
+                
                 ## Get the location name and add to the list for the log DF
                 locations.append(loc)
                 loc_name = STATES[loc]
                 
-                ## Compose status with current number and date
+                ## Current dates
+                current_date = ts_df['Date'].max().strftime("%b. %d, %Y")
+                current_datetime = ts_df['Date'].max()
+                current_dates.append(current_datetime)
+                
+                ## Create the plots, statuses and tweet
                 if loc == 'All': 
-                    ## Sum across all states for all
+                    ### Lineplot for "All" states
+                    ts_plot_name = plot_timeseries(ts_df, loc, series)
+                    ts_plot_names.append(ts_plot_name)
+                
+                    ## Compose status with current number and date
+                    ## Sum across all states and list each state's value in order
                     current_date_df = ts_df[ts_df['Date'] == ts_df['Date'].max()].sort_values(series, ascending = False).copy()
                     current_number = np.sum(current_date_df[series])
                     top_phrasing = ''
                     for i, row in current_date_df.iterrows():
                         top_phrasing = f"{top_phrasing}{row['State']}: {np.round(row[series], 1):,}\n"
-                else:
-                    current_number = int(ts_df[series][ts_df['Date'].idxmax()])
-                    top_phrasing = ''
                     
-                current_date = ts_df['Date'].max().strftime("%b. %d, %Y")
-                current_datetime = ts_df['Date'].max()
-                                
-                status = f"There have been {current_number:,} {dfs[series]['status']} COVID-19 in {loc_name}, as of {current_date}.\n\n{top_phrasing}\nSource: @usafacts #MadewithUSAFacts."
-                statuses.append(status)
-                current_dates.append(current_datetime)
-                
-                ## Tweet the trend plot if there's more than 10 cases, otherwise, just the status
-                if current_number > 10:
-                    image_open = open(plot_name, 'rb')
+                    ## Paste it together in a sentence
+                    ts_status = f"There have been {current_number:,} {dfs[series]['status']} COVID-19 in {loc_name}, as of {current_date}.\n\n{top_phrasing}\nSource: @usafacts #MadewithUSAFacts."
+                    ts_statuses.append(ts_status)
+                    
+                    ## Tweet the status
+                    image_open = open(ts_plot_name, 'rb')
                     response = api.upload_media(media = image_open)
-                    api.update_status(status=status, media_ids = [response['media_id']])
+                    api.update_status(status=ts_status, media_ids = [response['media_id']])
+                    
+                    ### Null values for new case curve
+                    new_case_statuses.append(None)
+                    new_case_plot_names.append(None)
+                    
                 else:
-                    api.update_status(status=status)
-    
+                    # New case curves for individual states
+                    new_curve_plot_name = new_case_curve(ts_df, loc, series)
+                    new_case_plot_names.append(new_curve_plot_name)
+                    
+                    ## Compose status with current number and date
+                    ## Sum across all states and list each state's value in order
+                    current_date_df = ts_df[ts_df['Date'] == ts_df['Date'].max()].copy()
+                    current_number = int(current_date_df['new'])
+                                        
+                    ## Paste it together in a sentence
+                    new_case_status = f"There were {current_number:,} {dfs[series]['new_case_status']} COVID-19 in {loc_name} on {current_date}.\nSource: @usafacts #MadewithUSAFacts."
+                    new_case_statuses.append(new_case_status)
+                    
+                    ## Tweet the status
+                    image_open = open(new_curve_plot_name, 'rb')
+                    response = api.upload_media(media = image_open)
+                    api.update_status(status=new_case_status, media_ids = [response['media_id']])
+                                        
+                    ### Null values for line plot
+                    ts_statuses.append(None)
+                    ts_plot_names.append(None)
+                    
+        
     ## Logging tweets sent
-    tweets_sent = pd.DataFrame({'status': statuses, 'plot_filepath': plot_names,
-                                'data_date': current_dates, 'location': locations})
+    tweets_sent = pd.DataFrame({'status': ts_statuses, 'plot_filepath': ts_plot_names,
+                                'data_date': current_dates, 'location': locations,
+                                'new_case_plot_filepath': new_case_plot_names,
+                                'new_case_status': new_case_statuses})
+    
     if len(tweets_sent) > 0:
         tweets_sent.to_csv(f"log/tweet_log_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv",
                            index = False)
