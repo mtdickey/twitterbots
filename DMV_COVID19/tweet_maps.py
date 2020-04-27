@@ -160,7 +160,12 @@ def tweet_image(gdf, series_name, top_n = 5, pop_adjusted = False):
 
     
     ## Tweet the image
-    status = f'Number of {phrasing} {pop_adj_note} in the DMV by county, as of {last_day_dt_str}.\n\nTop {top_n}:\n{top_phrasing}\n\nSource: @usafacts #MadewithUSAFacts.'
+    status = f'Number of {phrasing} {pop_adj_note} in the DMV by county, as of {last_day_dt_str}.\n\nTop {top_n}:\n{top_phrasing}'
+    source_note = '\n\nSource: @usafacts #MadewithUSAFacts.'
+    if (len(status) + len(source_note)) > 280:
+        pass
+    else:
+        status = status + source_note
     image_open = open(img_path, 'rb')
     response = api.upload_media(media = image_open)
     api.update_status(status=status, media_ids = [response['media_id']])
