@@ -200,6 +200,8 @@ def main():
     for series in dfs:
         for loc in STATES:
             
+            print(f"{series}_{loc}")
+            
             ## Tidy the data
             ts_df = tidy_timeseries(dfs[series]['df'], loc, series)
             
@@ -217,6 +219,8 @@ def main():
                (ts_df['Date'].max() > max_dt_state_history) &
                (~np.isnan(np.round(ts_df[series][ts_df['Date'].idxmax()])))):
                 
+                print(f"inside first IF statement")
+
                 ## Get the location name and add to the list for the log DF
                 locations.append(loc)
                 loc_name = STATES[loc]
@@ -228,6 +232,9 @@ def main():
                 
                 ## Create the plots, statuses and tweet
                 if loc == 'All': 
+                    
+                    print("Inside loc if statement")
+                    
                     ### Lineplot for "All" states
                     ts_plot_name = plot_timeseries(ts_df, loc, series)
                     ts_plot_names.append(ts_plot_name)
@@ -245,15 +252,18 @@ def main():
                     ts_statuses.append(ts_status)
                     
                     ## Tweet the status
-                    image_open = open(ts_plot_name, 'rb')
-                    response = api.upload_media(media = image_open)
-                    api.update_status(status=ts_status, media_ids = [response['media_id']])
+                    with image_open as open(ts_plot_name, 'rb'):
+                        response = api.upload_media(media = image_open)
+                        api.update_status(status=ts_status, media_ids = [response['media_id']])
                     
                     ### Null values for new case curve
                     new_case_statuses.append(None)
                     new_case_plot_names.append(None)
                     
                 else:
+                    
+                    print("Inside loc if statement")
+                    
                     # New case curves for individual states
                     new_curve_plot_name = new_case_curve(ts_df, loc, series)
                     new_case_plot_names.append(new_curve_plot_name)
@@ -262,21 +272,21 @@ def main():
                     ## Sum across all states and list each state's value in order
                     current_date_df = ts_df[ts_df['Date'] == ts_df['Date'].max()].copy()
                     current_number = int(current_date_df['new'])
-                                        
+                    
                     ## Paste it together in a sentence
                     new_case_status = f"There were {current_number:,} {dfs[series]['new_case_status']} COVID-19 in {loc_name} on {current_date}.\nSource: @usafacts #MadewithUSAFacts."
                     new_case_statuses.append(new_case_status)
                     
                     ## Tweet the status
-                    image_open = open(new_curve_plot_name, 'rb')
-                    response = api.upload_media(media = image_open)
-                    api.update_status(status=new_case_status, media_ids = [response['media_id']])
-                                        
+                    with image_open as open(new_curve_plot_name, 'rb'):
+                        response = api.upload_media(media = image_open)
+                        api.update_status(status=new_case_status, media_ids = [response['media_id']])
+                    
                     ### Null values for line plot
                     ts_statuses.append(None)
                     ts_plot_names.append(None)
-                    
-        
+    
+    
     ## Logging tweets sent
     tweets_sent = pd.DataFrame({'status': ts_statuses, 'plot_filepath': ts_plot_names,
                                 'data_date': current_dates, 'location': locations,
