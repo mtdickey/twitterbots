@@ -14,9 +14,11 @@ DMV_COVID19/shapefiles/
 
 # logs
 DMV_COVID19/log/
+SunsetWxBot/log/
 
 # config
 DMV_COVID19/tweet_config.py
+SunsetWxBot/tweet_config.py
 
 # C extensions
 *.so
