@@ -70,9 +70,7 @@ class SunTweeter():
         
         ## Check the quality
         quality = self.sunsetwx_response['features'][0]['properties']['quality']
-        
-        print(f"{self.location} {quality}")
-        
+                
         if quality == 'Great':
             
             local_time_str = self.time_converted.strftime("%I:%M %p")
@@ -117,7 +115,7 @@ def main():
     """
     
     ## Determine whether to query for the sunset or sunrise
-    if datetime.now().hour > 20:
+    if datetime.now().hour >= 20:
         ## Run sunrise tweets after 8PM
         type = 'sunrise'
     else:
