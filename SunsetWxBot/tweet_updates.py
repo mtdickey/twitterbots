@@ -40,7 +40,7 @@ class SunTweeter():
     The SunTweeter class contains methods for gathering sunrise/sunset data from SunsetWx composing tweets.
     """
     
-    def __init__(self, location, type):
+    def __init__(self, location, type, log_df = TWEET_HISTORY_DF):
         """
         Instantiate the class with the following parameters.
         
@@ -51,7 +51,7 @@ class SunTweeter():
         self.lat = c.LOCATIONS[self.location]['lat']
         self.lon = c.LOCATIONS[self.location]['lon']
         self.sunsetwx_response = py_sunsetwx.get_quality(self.lat, self.lon, self.type)
-        self.log_df = None    
+        self.log_df = log_df    
         
         ## Find the time of the sunrise/sunset
         #### Lookup civil time of "dawn" if sunrise, "dusk" if sunset
@@ -64,13 +64,16 @@ class SunTweeter():
         
     def send_tweet(self):
         """
-        Method to send tweets conditional upon the sunset/sunrise being nice enough
+        Method to send tweets conditional upon the sunset/sunrise being nice enough.
         
+        Returns: None
         """
         
-        ## Check the quality
+        ## Check the quality/score
         quality = self.sunsetwx_response['features'][0]['properties']['quality']
-                
+        score = self.sunsetwx_response['features'][0]['properties']['quality_percent']
+        
+        ## For great ones... compose a status
         if quality == 'Great':
             
             local_time_str = self.time_converted.strftime("%I:%M %p")
@@ -80,33 +83,45 @@ class SunTweeter():
                 time_of_day_str = 'this evening'
             status = f'Looks like there will be a great {self.type} in {self.location} {time_of_day_str}!  Check it out at {local_time_str}.'
             
-            ## Get the quality score in case we want it for post-hoc analysis
-            score = self.sunsetwx_response['features'][0]['properties']['quality_percent']
-            
-            ## Post it and log it
+            ## Post about the great ones
             api.update_status(status=status)
-            self.new_tweet_log(status, datetime.today().strftime("%Y-%m-%d"), score)
+        
+        ## Update the log regardless
+        self.update_log_record(datetime.today().strftime("%Y-%m-%d"), score)
     
     
-    def new_tweet_log(self, status, current_date, score):
+    def update_log_record(self, current_date, score):
         """
-        Take in tweet metadata and add it to the log.
+        Update the log_df attribute for the given record.
+        
+        :param current_date (str): Current date in %Y-%m-%d format
+        :param score (float): Quality score/percent out of 100
+        
+        Returns: None
         """
         
-        ## Logging tweets sent
-        tweets_sent = pd.DataFrame({'status': [status],
-                                    'date': [current_date],
-                                    'location': [self.location],
-                                    'quality_score': [score]})
+        ## Find the relevant index
+        log_index = list(self.log_df[((self.log_df['city'] == self.location) & 
+                                 (self.log_df['type'] == self.type))].index)[0]
         
-        ## Append if there's an existing DF in the log    
-        if self.log_df is not None:
-            log_df = self.log_df.append(tweets_sent)
+        ## Update last run date
+        self.log_df.loc[log_index, 'last_run_dt'] = current_date
+        
+        ## Update the record's quality category counts
+        if score < 25:
+            self.log_df.loc[log_index, 'n_poor'] = self.log_df['n_poor'][log_index]+1
+        elif score < 50:
+            self.log_df.loc[log_index, 'n_fair'] = self.log_df['n_fair'][log_index]+1
+        elif score < 75:
+            self.log_df.loc[log_index, 'n_good'] = self.log_df['n_good'][log_index]+1
         else:
-            log_df = tweets_sent
+            self.log_df[log_index, 'n_great'] = self.log_df['n_great'][log_index]+1
         
-        self.log_df = log_df
-        return log_df
+        ## Update the average quality score and n_runs
+        self.log_df.loc[log_index, 'avg_quality_score'] = ((self.log_df['avg_quality_score'][log_index]*
+                                                            self.log_df['n_runs'][log_index] + 
+                                                            score)/(self.log_df['n_runs'][log_index]+1))
+        self.log_df.loc[log_index, 'n_runs'] = self.log_df['n_runs'][log_index]+1
 
 
 def main():
@@ -122,25 +137,20 @@ def main():
         ## Any earlier, run sunset tweets (by default run at 12PM)
         type = 'sunset'
     
-    logs = []    
     ## Iterate through the time series and states
+    log_df = TWEET_HISTORY_DF.copy()
     for loc in c.LOCATIONS.keys():
             
         ## Instantiate a class to do the tweetin'
-        MySunTweeter = SunTweeter(loc, type)
+        MySunTweeter = SunTweeter(loc, type, log_df)
         MySunTweeter.send_tweet()
         
-        if MySunTweeter.log_df is not None:
-            ## If there was a tweet logged, add it to the list
-            logs.append(MySunTweeter.log_df)
+        ## Save the log to use in the next iteration of the loop
+        log_df = MySunTweeter.log_df
     
-    if len(logs) > 0:
-        tweets_sent_df = pd.concat(logs)
-        tweets_sent_df.to_csv(f"log/tweet_log_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv",
-                              index = False)
-        new_log_df = pd.concat([TWEET_HISTORY_DF, tweets_sent_df], sort = False)
-        new_log_df.to_csv("log/SunsetWx_full_tweet_log.csv",
-                          index = False)
+    ## Overwrite the log with the updated records
+    log_df.to_csv("log/SunsetWx_full_tweet_log.csv",
+                       index = False)
 
 
 if __name__ == "__main__":
