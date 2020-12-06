@@ -27,7 +27,7 @@ import seaborn as sns; sns.set(color_codes=True)
 import tweet_config as config
 
 ### Read in current data from usafacts.org
-confirmed_response = requests.get("https://usafactsstatic.blob.core.windows.net/public/data/covid-19/covid_confirmed_usafacts.csv")
+confirmed_response = requests.get("https://static.usafacts.org/public/data/covid-19/covid_confirmed_usafacts.csv")
 confirmed_file_object = io.StringIO(confirmed_response.content.decode('utf-8'))
 confirmed_df = pd.read_csv(confirmed_file_object)
 deaths_response = requests.get("https://usafactsstatic.blob.core.windows.net/public/data/covid-19/covid_deaths_usafacts.csv")
