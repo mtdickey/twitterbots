@@ -277,9 +277,7 @@ class RonaTweeter():
         
         ## If there's a new date in the data for that state make a status and a plot
         if self.tidy_data['Date'].max() > max_dt_state_history:
-            
-            print(f"In new data if {self.tidy_data['Date'].max()} vs. {max_dt_state_history}")
-            
+                        
             ## Get the plot/status based on the tweet_type
             if tweet_type == 'new_cases':
                 plot_filename, status = self.new_case_curve()
